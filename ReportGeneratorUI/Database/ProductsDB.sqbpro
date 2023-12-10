@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?><sqlb_project><db path="C:/Users/pm82k/source/repos/ReportGenerator/ReportGenerator/bin/Debug/net6.0/database/ProductsDB.db" readonly="0" foreign_keys="1" case_sensitive_like="0" temp_store="0" wal_autocheckpoint="1000" synchronous="2"/><attached/><window><main_tabs open="structure browser query" current="2"/></window><tab_structure><column_width id="0" width="300"/><column_width id="1" width="0"/><column_width id="2" width="100"/><column_width id="3" width="4003"/><column_width id="4" width="0"/><expanded_item id="0" parent="1"/><expanded_item id="1" parent="1"/><expanded_item id="2" parent="1"/><expanded_item id="3" parent="1"/></tab_structure><tab_browse><current_table name="4,23:mainCostsAndInclusionCounts"/><default_encoding codec=""/><browse_table_settings><table schema="main" name="CostsAndInclusionCounts" show_row_id="0" encoding="" plot_x_axis="" unlock_view_pk="_rowid_"><sort/><column_widths><column index="1" value="40"/><column index="2" value="55"/><column index="3" value="53"/><column index="4" value="49"/></column_widths><filter_values/><conditional_formats/><row_id_formats/><display_formats/><hidden_columns/><plot_y_axes/><global_filter/></table><table schema="main" name="Links" show_row_id="0" encoding="" plot_x_axis="" unlock_view_pk="_rowid_"><sort/><column_widths><column index="1" value="84"/><column index="2" value="68"/><column index="3" value="55"/></column_widths><filter_values/><conditional_formats/><row_id_formats/><display_formats/><hidden_columns/><plot_y_axes/><global_filter/></table><table schema="main" name="Product" show_row_id="0" encoding="" plot_x_axis="" unlock_view_pk="_rowid_"><sort/><column_widths><column index="1" value="40"/><column index="2" value="105"/><column index="3" value="88"/></column_widths><filter_values/><conditional_formats/><row_id_formats/><display_formats/><hidden_columns/><plot_y_axes/><global_filter/></table></browse_table_settings></tab_browse><tab_sql><sql name="SQL 1">with h as
+(
+		Select up.Id as 'UpId',
+			   p.Id as 'Id',
+			   l.Count as 'Count', 
+			   l.Count * p.Price as 'Cost'
+		from Links as l
+		join Product as up on up.Id = l.UpProduct
+		join Product as p on p.Id = l.Product
+)
+
+Select * from h
+
+</sql><sql name="Edit View CostsAndInclusionCounts">DROP VIEW &quot;main&quot;.&quot;CostsAndInclusionCounts&quot;;
+CREATE VIEW CostsAndInclusionCounts as 
+
+with h as 
+(
+	Select up.Id as 'UpId',
+		   p.Id as 'Id',
+		   l.Count as 'Count', 
+		   p.Price as 'Price'
+	from Links as l
+	join Product as up on up.Id = l.UpProduct
+	join Product as p on p.Id = l.Product
+)
+
+select 
+	p.Id,
+	coalesce(sum(h2.count), 0) as 'Count',-- of included products per 1 product', 
+	coalesce(sum(h2.cost), 0) + p.price as 'Cost',-- of one product'
+	p.price as 'Price'
+from Product as p
+left join 
+(
+	SELECT 
+		h.UpId, 
+		h.Id, 
+		h.count + coalesce(sum(h.count * hh.count), 0) as 'count', 
+		(h.price + sum(coalesce(hh.price * hh.count, 0))) * h.count as 'cost',
+		h.price
+	from h
+	left join h as hh on h.Id = hh.UpId
+	group by h.UpId, h.Id
+	order by h.UpId
+
+) as h2 on h2.UpId = p.Id 
+group by p.Id</sql><sql name="zapros.sql">with h as 
+(
+	Select up.Id as 'UpId',
+		   p.Id as 'Id',
+		   l.Count as 'Count', 
+		   p.Price as 'Price'
+	from Links as l
+	join Product as up on up.Id = l.UpProduct
+	join Product as p on p.Id = l.Product
+)
+
+select 
+	p.Id,
+	coalesce(sum(h2.count), 0) as 'Count',-- of included products per 1 product', 
+	coalesce(sum(h2.cost), 0) + p.price as 'Cost',-- of one product'
+	p.price as 'Price'
+from Product as p
+left join 
+(
+	SELECT 
+		h.UpId, 
+		h.Id, 
+		h.count + coalesce(sum(h.count * hh.count), 0) as 'count', 
+		(h.price + sum(coalesce(hh.price * hh.count, 0))) * h.count as 'cost',
+		h.price
+	from h
+	left join h as hh on h.Id = hh.UpId
+	group by h.UpId, h.Id
+	order by h.UpId
+
+) as h2 on h2.UpId = p.Id 
+group by p.Id</sql><sql name="SQL 6">with RECURSIVE hierarchy as 
+(
+	SELECT 
+		p.Id as 'Id', 
+		null as 'UpId', 
+		1 as 'Count',
+		1 as 'level', 
+		cast(Id as text) as 'path' 
+		
+	from Product as p
+	where p.Id not in (SELECT l.Product from Links as l)
+	
+	union all
+	
+	SELECT 
+		l.Product, 
+		l.UpProduct, 
+		l.Count,
+		h.level + 1 as 'level', 
+		h.path || '.' || cast(l.Product as text) as 'path' 
+		from hierarchy as h, Links as l
+	where l.UpProduct = h.Id
+)
+
+SELECT
+	h.UpId,
+	h.Id, 
+	h.path,
+	h.count,
+	h.level
+	from hierarchy as h
+    ORDER by h.path
+</sql><sql name="Close">with RECURSIVE hierarchy as 
+(
+	SELECT 
+		p.Id as 'Id', 
+		null as 'UpId', 
+		1 as 'Count',
+		1 as 'level', 
+		cast(Id as text) as 'path' 
+		
+	from Product as p
+	where p.Id not in (SELECT Product from Links)
+	
+	union all
+	
+	SELECT 
+		l.Product, 
+		l.UpProduct, 
+		l.Count as 'Count',
+		h.level + 1 as 'level', 
+		h.path || '.' || cast(l.Product as text) as 'path' 
+		from hierarchy as h, Links as l
+	where l.UpProduct = h.Id
+)
+
+Select 
+	h.Id,
+	p.Name,
+	h.Count,
+	cc.Cost * h.Count as 'Cost',
+	p.Price,
+	cc.count * h.Count as 'InclusionCount',
+	h.level as 'Level'
+from
+(
+	SELECT
+		rh.Id, 
+		rh.path,
+		rh.level,
+		rh.Count
+	from hierarchy as rh
+    ORDER by rh.path
+) as h
+
+join CostsAndInclusionCounts as cc on cc.Id = h.id
+join Product as p on p.Id = h.Id
+
+
+</sql><sql name="ReportQuery.sql">with RECURSIVE hierarchy as 
+(
+	SELECT 
+		p.Id as 'Id', 
+		null as 'UpId', 
+		1 as 'Count',
+		1 as 'level', 
+		cast(Id as text) as 'path' 
+		
+	from Product as p
+	where p.Id not in (SELECT Product from Links)
+	
+	union all
+	
+	SELECT 
+		l.Product, 
+		l.UpProduct, 
+		l.Count as 'Count',
+		h.level + 1 as 'level', 
+		h.path || '.' || cast(l.Product as text) as 'path' 
+		from hierarchy as h, Links as l
+	where l.UpProduct = h.Id
+), 
+lpp as 
+(
+	Select up.Id as 'UpId',
+		   p.Id as 'Id',
+		   l.Count as 'Count', 
+		   p.Price as 'Price'
+	from Links as l
+	join Product as up on up.Id = l.UpProduct
+	join Product as p on p.Id = l.Product
+),
+cc as
+(
+
+	select 
+		p.Id,
+		coalesce(sum(h2.count), 0) as 'Count',-- of included products per 1 product', 
+		coalesce(sum(h2.cost), 0) + p.price as 'Cost',-- of one product'
+		p.price as 'Price'
+	from Product as p
+	left join 
+	(
+		SELECT 
+			lpp.UpId, 
+			lpp.Id, 
+			lpp.count + coalesce(sum(lpp.count * lpp2.count), 0) as 'count', 
+			(lpp.price + sum(coalesce(lpp2.price * lpp2.count, 0))) * lpp.count as 'cost',
+			lpp.price
+		from lpp
+		left join lpp as lpp2 on lpp.Id = lpp2.UpId
+		group by lpp.UpId, lpp.Id
+		order by lpp.UpId
+
+	) as h2 on h2.UpId = p.Id 
+	group by p.Id
+)
+
+
+Select 
+	h.Id,
+	p.Name,
+	h.Count,
+	cc.Cost * h.Count as 'Cost',
+	p.Price,
+	cc.count * h.Count as 'InclusionCount',
+	h.level as 'Level'
+from
+(
+	SELECT
+		rh.Id, 
+		rh.path,
+		rh.Level,
+		rh.Count
+	from hierarchy as rh
+) as h
+
+join cc on cc.Id = h.id
+join Product as p on p.Id = h.Id
+ORDER by h.path
+
+
+</sql><current_tab id="5"/></tab_sql></sqlb_project>
